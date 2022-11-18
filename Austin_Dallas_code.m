@@ -11,8 +11,8 @@ max_speed = 150/60;
 max_range = 60;
 
 [num,txt,raw] = xlsread("Austin_Dallas.xlsx",1,'A1:AE30');  % read the file for distance
-%[num2,txt2,raw2] = xlsread("Austin_Dallas.xlsx",2,'A35:D64');  % read the file for distance
-[num2,txt2,raw2] = xlsread("Austin_Dallas.xlsx",3,'A35:D64');  % read the file for distance
+[num2,txt2,raw2] = xlsread("Austin_Dallas.xlsx",2,'A35:D64');  % read the file for distance
+%[num2,txt2,raw2] = xlsread("Austin_Dallas.xlsx",3,'A35:D64');  % read the file for distance
 
 dist_data = num(:,3:end);
 q_data = num2(:,3:end);
@@ -46,16 +46,17 @@ queue = q_data(:,2);
 
 x_e = zeros(2,N_edge);
 idx = sub2ind(size(dist_data),edge_arr(:,2),edge_arr(:,3));
-dt = 3;
-x_e(1,:) = floor(dist_data(idx)/max_speed/dt)*dt;   % minimum travel time floor to 2 * integer in minute
-x_e(2,:) = round(x_e(1,:)*1.2/dt)*dt+dt;
+x_e(1,:) = floor(dist_data(idx)/max_speed/3)*3;   % minimum travel time floor to 2 * integer in minute
+x_e(2,:) = round(x_e(1,:)*1.2/3)*3+3;
 
+
+dt = 3;             % step size for discretizing
 
 b_cap = 30;         % capacity of battery
 T_b = b_cap/5;      % total time to fully recharge battery
-k_b_hat = 2;        % set there to be k_b_hat states of recharging (besides 0)
+k_b_hat = 2;        % set there to be 4 states of recharging (besides 0)
 dT_b = T_b/k_b_hat; % time step of battery recharging
-dt_b = b_cap/k_b_hat; % step size of battery recharging
+dt_b = b_cap/dt/k_b_hat; % step size of battery recharging
 
 [Prob_preset] = queue_preset(queue,k_b_hat);
 
@@ -64,7 +65,7 @@ A = zeros(1,length(E)+1);   % preset actions
 
 % reward design
 r_t = -dt;  % time-step penalty
-r_b = dT_b/dt*r_t;   % recharging penalty
+r_b = -dT_b;   % recharging penalty
 r_a = 1000;   % reward for arrival
 r_s = -1000;      % sink penalty
 r_d = -1000;     % battery dies
@@ -190,7 +191,7 @@ S_b = cell(length(V),3);
 N_state = k_b_hat+1+b_cap/dt;
 state_arr = zeros(N_state,4);   % initialize states for battery   
 
-state_arr(1:b_cap/dt,end) = transpose(1:b_cap/dt)*dt;      % helper states
+state_arr(1:b_cap/dt,end) = transpose(1:dt:b_cap);      % helper states
 
 
 for kk_b = 1:k_b_hat
@@ -369,14 +370,18 @@ for k_v = 1:length(V)
     action_arr = S_b{k_v,3};
 
 
+    if k_v == 4
+        blabla = 1;
+    end
 
     % from battery helper states -> batter states
     for kk = 1:b_cap/dt
         ind =  N_start+kk-1;
-        ind_temp = ceil(state_arr(kk,end)/dt_b);
+        ind_temp = floor(state_arr(kk,end)/dt_b);
         ind_next = ind_temp+1+b_cap/dt+N_start-1;
         P(ind,ind_next,end) = 1;
-        R(ind,ind_next,end) = r_b*(state_arr(ind_temp+1+b_cap/dt,end)-state_arr(kk,end))/dt_b;
+        R(ind,ind_next,end) = 0;
+
 
     end
 
@@ -410,7 +415,6 @@ for k_v = 1:length(V)
     end
 
 end
-
 
 
 
@@ -532,18 +536,13 @@ end
 
 mdp_verbose
 % [policy, iter, cpu_time] = mdp_value_iteration(P, R, discount, epsilon, max_iter, V0)
-[value,policy, iter, cpu_time] = mdp_value_iteration_test(P, R, 0.99,10,1000);
+[value,policy, iter, cpu_time] = mdp_value_iteration(P, R, 0.99,10,1000);
 
 
-% save('Austin_Dallas_d6.mat')
-% save('PR_d6.mat', 'P','R', '-v7.3')
-
-% save('AD_d12.mat')
-% save('PR_d12.mat', 'P','R', '-v7.3')
+save('Austin_Dallas_d3.mat')
+save('PR_d3.mat', 'P','R', '-v7.3')
 
 
-% save('AD_d6.mat')
-% save('PR_new_d6.mat', 'P','R', '-v7.3')
 
 function [prob] = queue_next(diff,v)
     global queue;
